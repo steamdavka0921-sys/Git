@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Telegram Mini App</title>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    
+    <!-- Telegram WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+            min-height: 100vh;
+            padding: 20px;
+            transition: all 0.3s;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 20px;
+            background: var(--tg-theme-secondary-bg-color, #f0f0f0);
+            border-radius: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .user-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: var(--tg-theme-button-color, #3390ec);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        
+        .user-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .user-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .user-name {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 5px;
+            word-wrap: break-word;
+        }
+        
+        .user-username {
+            font-size: 14px;
+            color: var(--tg-theme-hint-color, #999999);
+            word-wrap: break-word;
+        }
+        
+        .user-id {
+            font-size: 12px;
+            color: var(--tg-theme-hint-color, #999999);
+            margin-top: 3px;
+        }
+        
+        .content {
+            background: var(--tg-theme-secondary-bg-color, #f0f0f0);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .content h2 {
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+        
+        .content p {
+            color: var(--tg-theme-hint-color, #666666);
+            line-height: 1.5;
+        }
+        
+        .button {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            background: var(--tg-theme-button-color, #3390ec);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.3s, transform 0.1s;
+            margin-bottom: 10px;
+        }
+        
+        .button:active {
+            opacity: 0.8;
+            transform: scale(0.98);
+        }
+        
+        .button-secondary {
+            background: var(--tg-theme-secondary-bg-color, #f0f0f0);
+            color: var(--tg-theme-text-color, #000000);
+            border: 2px solid var(--tg-theme-button-color, #3390ec);
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 50px 20px;
+        }
+        
+        .spinner {
+            border: 3px solid var(--tg-theme-secondary-bg-color, #f0f0f0);
+            border-top: 3px solid var(--tg-theme-button-color, #3390ec);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .stat-card {
+            background: var(--tg-theme-bg-color, #ffffff);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.05);
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--tg-theme-button-color, #3390ec);
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: var(--tg-theme-hint-color, #999999);
+            margin-top: 5px;
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #4caf50;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transform: translateX(150%);
+            transition: transform 0.3s;
+            z-index: 1000;
+        }
+        
+        .notification.show {
+            transform: translateX(0);
+        }
+        
+        .welcome-message {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .welcome-message h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .welcome-message p {
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Loading state -->
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p>Уншиж байна...</p>
+        </div>
+        
+        <!-- Main content (hidden initially) -->
+        <div id="main-content" style="display: none;">
+            <!-- Welcome message -->
+            <div class="welcome-message">
+                <h1>🎉 Сайн байна уу!</h1>
+                <p>Таны Telegram Mini App-д тавтай морил</p>
+            </div>
+            
+            <!-- User header -->
+            <div class="header">
+                <div class="user-avatar" id="user-avatar">
+                    <span id="avatar-text">U</span>
+                    <img id="avatar-img" src="" alt="" style="display: none;">
+                </div>
+                <div class="user-info">
+                    <div class="user-name" id="user-name">Хэрэглэгч</div>
+                    <div class="user-username" id="user-username">@username</div>
+                    <div class="user-id" id="user-id">ID: -</div>
+                </div>
+            </div>
+            
+            <!-- Main content area -->
+            <div class="content">
+                <h2>Сайн байна уу, <span id="greeting-name">Хэрэглэгч</span>! 👋</h2>
+                <p>Та Telegram-аар амжилттай нэвтэрлээ. Одоо та Firebase-д бүртгэгдсэн байна.</p>
+                
+                <!-- Stats -->
+                <div class="stats">
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-visits">0</div>
+                        <div class="stat-label">Зочилолт</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-actions">0</div>
+                        <div class="stat-label">Үйлдэл</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-points">0</div>
+                        <div class="stat-label">Оноо</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Action buttons -->
+            <button class="button" id="action-btn">🚀 Үйлдэл хийх</button>
+            <button class="button button-secondary" id="share-btn">📤 Хуваалцах</button>
+            <button class="button button-secondary" id="close-btn">✖ Хаах</button>
+        </div>
+    </div>
+    
+    <!-- Notification -->
+    <div class="notification" id="notification"></div>
+    
+    <script>
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCRf9qxpWeul89U6h9aX0OwlO1-BnkhfxI",
+            authDomain: "telegram-b2ee0.firebaseapp.com",
+            projectId: "telegram-b2ee0",
+            storageBucket: "telegram-b2ee0.firebasestorage.app",
+            messagingSenderId: "871553968836",
+            appId: "1:871553968836:web:4b160c1b8245e2166bb791",
+            measurementId: "G-4LNWWNSGPJ"
+        };
+
+        // Firebase инициализаци
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // Telegram WebApp инициализаци
+        const tg = window.Telegram.WebApp;
+        
+        // Global variables
+        let currentUser = null;
+        let userStats = {
+            visits: 0,
+            actions: 0,
+            points: 0
+        };
+        
+        // Show notification
+        function showNotification(message) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.classList.add('show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+        
+        // Update user interface
+        function updateUI(user) {
+            const userName = document.getElementById('user-name');
+            const userUsername = document.getElementById('user-username');
+            const userId = document.getElementById('user-id');
+            const greetingName = document.getElementById('greeting-name');
+            const avatarText = document.getElementById('avatar-text');
+            const avatarImg = document.getElementById('avatar-img');
+            
+            // Set user name
+            const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ');
+            userName.textContent = fullName || 'Хэрэглэгч';
+            greetingName.textContent = user.first_name || 'Хэрэглэгч';
+            
+            // Set username
+            userUsername.textContent = user.username ? '@' + user.username : 'Username байхгүй';
+            
+            // Set user ID
+            userId.textContent = 'ID: ' + user.id;
+            
+            // Set avatar
+            if (user.photo_url) {
+                avatarImg.src = user.photo_url;
+                avatarImg.style.display = 'block';
+                avatarText.style.display = 'none';
+            } else {
+                avatarText.textContent = (user.first_name || 'U').charAt(0).toUpperCase();
+                avatarImg.style.display = 'none';
+                avatarText.style.display = 'block';
+            }
+        }
+        
+        // Update stats
+        function updateStats(stats) {
+            document.getElementById('stat-visits').textContent = stats.visits || 0;
+            document.getElementById('stat-actions').textContent = stats.actions || 0;
+            document.getElementById('stat-points').textContent = stats.points || 0;
+        }
+        
+        // Save user to Firebase
+        async function saveUserToFirebase(user) {
+            try {
+                const userRef = db.collection('users').doc(String(user.id));
+                
+                // Check if user exists
+                const doc = await userRef.get();
+                
+                if (doc.exists) {
+                    // User exists - update
+                    const existingData = doc.data();
+                    const newVisits = (existingData.visits || 0) + 1;
+                    
+                    await userRef.update({
+                        username: user.username || existingData.username || '',
+                        first_name: user.first_name,
+                        last_name: user.last_name || '',
+                        photo_url: user.photo_url || '',
+                        last_login: firebase.firestore.FieldValue.serverTimestamp(),
+                        visits: newVisits
+                    });
+                    
+                    userStats = {
+                        visits: newVisits,
+                        actions: existingData.actions || 0,
+                        points: existingData.points || 0
+                    };
+                    
+                    return userStats;
+                } else {
+                    // New user - create
+                    userStats = {
+                        visits: 1,
+                        actions: 0,
+                        points: 100 // Welcome bonus
+                    };
+                    
+                    await userRef.set({
+                        telegram_id: user.id,
+                        username: user.username || '',
+                        first_name: user.first_name,
+                        last_name: user.last_name || '',
+                        photo_url: user.photo_url || '',
+                        created_at: firebase.firestore.FieldValue.serverTimestamp(),
+                        last_login: firebase.firestore.FieldValue.serverTimestamp(),
+                        ...userStats
+                    });
+                    
+                    showNotification('🎉 Шинэ хэрэглэгч! 100 оноо бэлэглэлээ!');
+                    return userStats;
+                }
+            } catch (error) {
+                console.error('Firebase алдаа:', error);
+                showNotification('Firebase-д холбогдоход алдаа гарлаа');
+                return null;
+            }
+        }
+        
+        // Update action count
+        async function incrementAction() {
+            if (!currentUser) return;
+            
+            try {
+                const userRef = db.collection('users').doc(String(currentUser.id));
+                
+                userStats.actions += 1;
+                userStats.points += 10; // +10 points per action
+                
+                await userRef.update({
+                    actions: firebase.firestore.FieldValue.increment(1),
+                    points: firebase.firestore.FieldValue.increment(10)
+                });
+                
+                updateStats(userStats);
+                showNotification('✅ Үйлдэл амжилттай! +10 оноо');
+                
+                // Haptic feedback
+                tg.HapticFeedback.notificationOccurred('success');
+            } catch (error) {
+                console.error('Үйлдэл хийхэд алдаа:', error);
+                showNotification('Алдаа гарлаа');
+            }
+        }
+        
+        // Initialize app
+        async function initApp() {
+            try {
+                tg.ready();
+                tg.expand();
+                
+                // Get user from Telegram
+                const user = tg.initDataUnsafe?.user;
+                
+                if (user) {
+                    currentUser = user;
+                    
+                    // Update UI
+                    updateUI(user);
+                    
+                    // Save to Firebase
+                    const stats = await saveUserToFirebase(user);
+                    if (stats) {
+                        updateStats(stats);
+                    }
+                    
+                    // Hide loading, show content
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('main-content').style.display = 'block';
+                    
+                    // Configure Main Button
+                    tg.MainButton.setText('ҮНДСЭН ҮЙЛДЭЛ');
+                    tg.MainButton.show();
+                    tg.MainButton.onClick(() => {
+                        incrementAction();
+                    });
+                    
+                    showNotification('✅ Амжилттай нэвтэрлээ!');
+                } else {
+                    // No user data
+                    document.getElementById('loading').innerHTML = `
+                        <p style="color: red;">Хэрэглэгчийн мэдээлэл олдсонгүй.</p>
+                        <p>Энэ аппыг Telegram дотроос нээнэ үү.</p>
+                    `;
+                }
+            } catch (error) {
+                console.error('Initialization error:', error);
+                document.getElementById('loading').innerHTML = `
+                    <p style="color: red;">Алдаа гарлаа: ${error.message}</p>
+                `;
+            }
+        }
+        
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            // Action button
+            document.getElementById('action-btn').addEventListener('click', incrementAction);
+            
+            // Share button
+            document.getElementById('share-btn').addEventListener('click', () => {
+                if (currentUser) {
+                    const shareText = `Сайн уу! Би ${currentUser.first_name} Telegram Mini App-г ашиглаж байна! 🚀`;
+                    
+                    // Try to use Telegram share
+                    if (tg.openTelegramLink) {
+                        tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent('https://yourdomain.com')}&text=${encodeURIComponent(shareText)}`);
+                    } else {
+                        // Fallback to Web Share API
+                        if (navigator.share) {
+                            navigator.share({
+                                title: 'Telegram Mini App',
+                                text: shareText,
+                                url: 'https://yourdomain.com'
+                            });
+                        } else {
+                            showNotification('Хуваалцах боломжгүй');
+                        }
+                    }
+                }
+            });
+            
+            // Close button
+            document.getElementById('close-btn').addEventListener('click', () => {
+                tg.close();
+            });
+            
+            // Initialize
+            initApp();
+        });
+        
+        // Theme change handler
+        tg.onEvent('themeChanged', () => {
+            document.body.style.backgroundColor = tg.themeParams.bg_color;
+            document.body.style.color = tg.themeParams.text_color;
+        });
+    </script>
+</body>
+</html>
